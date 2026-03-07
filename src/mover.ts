@@ -2,9 +2,16 @@ import * as fs from "fs";
 import { join, extname, basename } from "path";
 import { log } from "./logger";
 
+/**
+ * Process-level lock set that tracks destination paths currently being claimed
+ * by in-flight moves. Prevents race conditions where two concurrent moveFile
+ * calls could compute the same uniqueDestination and overwrite each other.
+ */
+export const activeMoves = new Set<string>();
+
 export function uniqueDestination(destDir: string, fileName: string): string {
   const dest = join(destDir, fileName);
-  if (!fs.existsSync(dest)) return dest;
+  if (!fs.existsSync(dest) && !activeMoves.has(dest)) return dest;
 
   const ext = extname(fileName);
   const stem = basename(fileName, ext);
@@ -12,7 +19,7 @@ export function uniqueDestination(destDir: string, fileName: string): string {
   for (let i = 1; i < 2_147_483_647; i++) {
     const newName = ext ? `${stem}_${i}${ext}` : `${stem}_${i}`;
     const candidate = join(destDir, newName);
-    if (!fs.existsSync(candidate)) return candidate;
+    if (!fs.existsSync(candidate) && !activeMoves.has(candidate)) return candidate;
   }
 
   return join(destDir, `${fileName}_dup`);
@@ -79,12 +86,18 @@ export function moveFile(source: string, destDir: string, dryRun: boolean): stri
     return finalDest;
   }
 
+  // Reserve this destination path to prevent concurrent moves from claiming it
+  activeMoves.add(finalDest);
   try {
-    fs.renameSync(source, finalDest);
-  } catch (err: any) {
-    // Only fallback to copy+delete for cross-device errors
-    if (err?.code !== "EXDEV") throw err;
-    crossDriveMove(source, finalDest);
+    try {
+      fs.renameSync(source, finalDest);
+    } catch (err: any) {
+      // Only fallback to copy+delete for cross-device errors
+      if (err?.code !== "EXDEV") throw err;
+      crossDriveMove(source, finalDest);
+    }
+  } finally {
+    activeMoves.delete(finalDest);
   }
 
   return finalDest;

@@ -1,5 +1,5 @@
-import { describe, test, expect, mock, spyOn } from "bun:test";
-import { uniqueDestination, moveFile, crossDriveMove } from "./mover";
+import { describe, test, expect, mock, spyOn, beforeEach } from "bun:test";
+import { uniqueDestination, moveFile, crossDriveMove, activeMoves } from "./mover";
 import * as logger from "./logger";
 import * as fs from "fs";
 import { join } from "path";
@@ -209,6 +209,147 @@ describe("crossDriveMove", () => {
       expect(existsSync(source)).toBe(true);
     } finally {
       copySpy.mockRestore();
+    }
+  });
+});
+
+describe("activeMoves lock set — race condition prevention", () => {
+  beforeEach(() => {
+    activeMoves.clear();
+  });
+
+  test("two concurrent moves for same-named file get different destinations", () => {
+    const dir = setup("race_concurrent");
+    const srcDir = join(dir, "src");
+    const dstDir = join(dir, "dst");
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(dstDir, { recursive: true });
+
+    // Create two source files with the same name in different subdirs
+    const srcDirA = join(srcDir, "a");
+    const srcDirB = join(srcDir, "b");
+    mkdirSync(srcDirA, { recursive: true });
+    mkdirSync(srcDirB, { recursive: true });
+    const sourceA = join(srcDirA, "report.txt");
+    const sourceB = join(srcDirB, "report.txt");
+    writeFileSync(sourceA, "content from A");
+    writeFileSync(sourceB, "content from B");
+
+    // Mock renameSync to be slow — simulate the race window where both calls
+    // compute uniqueDestination before either has actually moved the file.
+    // We use a spy that captures the rename calls to observe both destinations.
+    const renameCalls: Array<[string, string]> = [];
+    const origRename = fs.renameSync;
+    const renameSpy = spyOn(fs, "renameSync").mockImplementation((src: any, dst: any) => {
+      renameCalls.push([src as string, dst as string]);
+      origRename(src, dst);
+    });
+
+    try {
+      const resultA = moveFile(sourceA, dstDir, false);
+      const resultB = moveFile(sourceB, dstDir, false);
+
+      // The two results must be DIFFERENT paths — no silent overwrite
+      expect(resultA).not.toBe(resultB);
+
+      // Both destination files must exist
+      expect(existsSync(resultA)).toBe(true);
+      expect(existsSync(resultB)).toBe(true);
+
+      // Content must be preserved — no data loss
+      const contents = new Set([
+        readFileSync(resultA, "utf-8"),
+        readFileSync(resultB, "utf-8"),
+      ]);
+      expect(contents.has("content from A")).toBe(true);
+      expect(contents.has("content from B")).toBe(true);
+    } finally {
+      renameSpy.mockRestore();
+    }
+  });
+
+  test("activeMoves set is exported and accessible", () => {
+    expect(activeMoves).toBeInstanceOf(Set);
+  });
+
+  test("activeMoves is empty after moveFile completes", () => {
+    const dir = setup("race_cleanup");
+    const srcDir = join(dir, "src");
+    const dstDir = join(dir, "dst");
+    mkdirSync(srcDir, { recursive: true });
+
+    const source = join(srcDir, "file.txt");
+    writeFileSync(source, "data");
+
+    moveFile(source, dstDir, false);
+
+    // After move completes, the lock must be released
+    expect(activeMoves.size).toBe(0);
+  });
+
+  test("activeMoves is cleaned up even when moveFile throws", () => {
+    const dir = setup("race_cleanup_error");
+    const srcDir = join(dir, "src");
+    const dstDir = join(dir, "dst");
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(dstDir, { recursive: true });
+
+    const source = join(srcDir, "fail.txt");
+    writeFileSync(source, "data");
+
+    const renameSpy = spyOn(fs, "renameSync").mockImplementation(() => {
+      throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+    });
+
+    try {
+      expect(() => moveFile(source, dstDir, false)).toThrow("EACCES");
+      // Lock must still be released despite the error
+      expect(activeMoves.size).toBe(0);
+    } finally {
+      renameSpy.mockRestore();
+    }
+  });
+
+  test("lock prevents same destination when first move is in-flight", () => {
+    const dir = setup("race_inflight");
+    const srcDir = join(dir, "src");
+    const dstDir = join(dir, "dst");
+    mkdirSync(srcDir, { recursive: true });
+    mkdirSync(dstDir, { recursive: true });
+
+    const srcDirA = join(srcDir, "a");
+    const srcDirB = join(srcDir, "b");
+    mkdirSync(srcDirA, { recursive: true });
+    mkdirSync(srcDirB, { recursive: true });
+    const sourceA = join(srcDirA, "doc.pdf");
+    const sourceB = join(srcDirB, "doc.pdf");
+    writeFileSync(sourceA, "pdf-A");
+    writeFileSync(sourceB, "pdf-B");
+
+    // Simulate race: first move "holds" the lock while second computes destination
+    // We intercept renameSync on the first call to do the second move mid-flight
+    let secondResult: string | undefined;
+    const origRename = fs.renameSync;
+    let callCount = 0;
+    const renameSpy = spyOn(fs, "renameSync").mockImplementation((src: any, dst: any) => {
+      callCount++;
+      if (callCount === 1) {
+        // While first rename is "in progress", trigger second moveFile
+        secondResult = moveFile(sourceB, dstDir, false);
+      }
+      origRename(src, dst);
+    });
+
+    try {
+      const firstResult = moveFile(sourceA, dstDir, false);
+
+      expect(firstResult).not.toBe(secondResult);
+      expect(existsSync(firstResult)).toBe(true);
+      expect(existsSync(secondResult!)).toBe(true);
+      expect(readFileSync(firstResult, "utf-8")).toBe("pdf-A");
+      expect(readFileSync(secondResult!, "utf-8")).toBe("pdf-B");
+    } finally {
+      renameSpy.mockRestore();
     }
   });
 });
