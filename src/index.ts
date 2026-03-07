@@ -1,1 +1,135 @@
-console.log("FileFlow starting...");
+import { parseArgs } from "util";
+import { existsSync, writeFileSync } from "fs";
+import { resolve } from "path";
+import { loadConfig, expandedWatchPaths, defaultConfigToml } from "./config";
+import { Classifier } from "./classifier";
+import { hasTempExtension, isFileAccessible, RetryQueue } from "./safety";
+import { moveFile } from "./mover";
+import { initLogger, log } from "./logger";
+import { startWatching, scanExisting } from "./watcher";
+
+const { values } = parseArgs({
+  args: Bun.argv.slice(2),
+  options: {
+    config: { type: "string", default: "fileflow.toml" },
+    "dry-run": { type: "boolean", default: false },
+    "scan-once": { type: "boolean", default: false },
+    init: { type: "boolean", default: false },
+  },
+});
+
+const configPath = resolve(values.config!);
+const dryRun = values["dry-run"]!;
+const scanOnce = values["scan-once"]!;
+const init = values.init!;
+
+if (init) {
+  if (existsSync(configPath)) {
+    console.error(`Config file already exists: ${configPath}`);
+    process.exit(1);
+  }
+  writeFileSync(configPath, defaultConfigToml());
+  console.log(`Created default config: ${configPath}`);
+  process.exit(0);
+}
+
+if (!existsSync(configPath)) {
+  console.error(`Config file not found: ${configPath}`);
+  console.error(`Run with --init to create a default config.`);
+  process.exit(1);
+}
+
+const config = loadConfig(configPath);
+initLogger(config.logging);
+
+log("info", "FileFlow starting...");
+if (dryRun) log("info", "[DRY-RUN] mode enabled — no files will be moved");
+
+const classifier = new Classifier(config.rules);
+const watchPaths = expandedWatchPaths(config);
+
+function processFile(filePath: string): void {
+  if (hasTempExtension(filePath, config.safety.ignore_extensions)) {
+    log("info", `SKIPPED ${filePath} (reason: temp_extension)`);
+    return;
+  }
+
+  const result = classifier.classify(filePath);
+  if (!result) {
+    log("info", `SKIPPED ${filePath} (reason: no_matching_rule)`);
+    return;
+  }
+
+  try {
+    const dest = moveFile(filePath, result.destination, dryRun);
+    log("info", `MOVED ${filePath} -> ${dest} (rule: ${result.ruleName})`);
+  } catch (e) {
+    log("error", `FAILED to move ${filePath} -> ${result.destination}: ${e}`);
+  }
+}
+
+if (scanOnce) {
+  log("info", "Scanning existing files...");
+  const files = scanExisting(watchPaths);
+  for (const file of files) {
+    processFile(file);
+  }
+  log("info", "Scan complete.");
+  process.exit(0);
+}
+
+// Daemon mode
+const retryQueue = new RetryQueue(config.safety.max_retries);
+const stabilityDelay = config.safety.stability_delay_seconds * 1000;
+const retryInterval = config.safety.retry_interval_seconds * 1000;
+
+// Deduplicate events (fs.watch fires multiple times per file)
+const recentEvents = new Map<string, number>();
+
+startWatching(watchPaths, async (event) => {
+  const now = Date.now();
+  const lastSeen = recentEvents.get(event.path);
+  if (lastSeen && now - lastSeen < stabilityDelay) return;
+  recentEvents.set(event.path, now);
+
+  // Clean old entries periodically
+  if (recentEvents.size > 1000) {
+    for (const [key, time] of recentEvents) {
+      if (now - time > 60000) recentEvents.delete(key);
+    }
+  }
+
+  if (hasTempExtension(event.path, config.safety.ignore_extensions)) {
+    log("info", `SKIPPED ${event.path} (reason: temp_extension)`);
+    return;
+  }
+
+  // Stability delay
+  await Bun.sleep(stabilityDelay);
+
+  if (!existsSync(event.path)) return;
+
+  if (isFileAccessible(event.path)) {
+    processFile(event.path);
+  } else {
+    log("info", `QUEUED ${event.path} (reason: file_locked)`);
+    retryQueue.add(event.path);
+  }
+});
+
+// Retry timer
+setInterval(() => {
+  const ready = retryQueue.drainReady();
+  for (const path of ready) {
+    log("info", `RETRY ${path}`);
+    processFile(path);
+  }
+}, retryInterval);
+
+log("info", "FileFlow daemon running. Press Ctrl+C to stop.");
+
+// Keep process alive
+process.on("SIGINT", () => {
+  log("info", "Shutting down...");
+  process.exit(0);
+});
