@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { hasTempExtension, isFileAccessible, RetryQueue } from "./safety";
-import { writeFileSync, mkdirSync, rmSync } from "fs";
+import { writeFileSync, mkdirSync, rmSync, chmodSync } from "fs";
 import { join } from "path";
 
 const ignoreExts = [".tmp", ".crdownload", ".part", ".partial", ".download", ".opdownload"];
@@ -30,6 +30,20 @@ describe("isFileAccessible", () => {
     const file = join(dir, "normal.txt");
     writeFileSync(file, "data");
     expect(isFileAccessible(file)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("returns true for read-only file", () => {
+    const dir = join(process.env.TEMP || "/tmp", "fileflow_test_access_readonly");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "readonly.txt");
+    writeFileSync(file, "data");
+
+    chmodSync(file, 0o444);
+    expect(isFileAccessible(file)).toBe(true);
+
+    chmodSync(file, 0o666);
     rmSync(dir, { recursive: true, force: true });
   });
 });

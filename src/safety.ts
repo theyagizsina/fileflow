@@ -10,7 +10,7 @@ export function hasTempExtension(filePath: string, ignoreExtensions: string[]): 
 
 export function isFileAccessible(filePath: string): boolean {
   try {
-    const fd = openSync(filePath, "r+");
+    const fd = openSync(filePath, "r");
     closeSync(fd);
     return true;
   } catch {

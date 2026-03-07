@@ -9,6 +9,10 @@ export interface FileEvent {
   path: string;
 }
 
+export interface ScanStats {
+  errors: number;
+}
+
 export type FileEventCallback = (event: FileEvent) => void;
 
 export function startWatching(paths: string[], callback: FileEventCallback): void {
@@ -39,20 +43,34 @@ export function startWatching(paths: string[], callback: FileEventCallback): voi
   }
 }
 
-export function scanExisting(paths: string[]): string[] {
+export function scanExisting(paths: string[], stats?: ScanStats): string[] {
   const files: string[] = [];
+
+  function scanDirRecursive(dir: string): void {
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const fullPath = join(dir, entry);
+      try {
+        const stat = statSync(fullPath);
+        if (stat.isFile()) {
+          files.push(fullPath);
+        } else if (stat.isDirectory()) {
+          scanDirRecursive(fullPath);
+        }
+      } catch (e) {
+        stats && (stats.errors += 1);
+        log("warn", `Failed to stat entry during scan, skipping: ${fullPath} (${e})`);
+      }
+    }
+  }
+
   for (const dir of paths) {
     try {
-      const entries = readdirSync(dir);
-      for (const entry of entries) {
-        const fullPath = join(dir, entry);
-        try {
-          if (statSync(fullPath).isFile()) {
-            files.push(fullPath);
-          }
-        } catch {}
-      }
-    } catch {}
+      scanDirRecursive(dir);
+    } catch (e) {
+      stats && (stats.errors += 1);
+      log("warn", `Watch path not readable during scan, skipping: ${dir} (${e})`);
+    }
   }
   return files;
 }

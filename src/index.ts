@@ -70,10 +70,41 @@ function processFile(filePath: string): void {
 
 if (scanOnce) {
   log("info", "Scanning existing files...");
-  const files = scanExisting(watchPaths);
+  const scanStats = { errors: 0 };
+  const summary = { found: 0, matched: 0, skipped: 0 };
+  const files = scanExisting(watchPaths, scanStats);
+  summary.found = files.length;
   for (const file of files) {
-    processFile(file);
+    if (hasTempExtension(file, config.safety.ignore_extensions)) {
+      log("info", `SKIPPED ${file} (reason: temp_extension)`);
+      summary.skipped++;
+      continue;
+    }
+
+    const result = classifier.classify(file);
+    if (!result) {
+      log("info", `SKIPPED ${file} (reason: no_matching_rule)`);
+      summary.skipped++;
+      continue;
+    }
+
+    try {
+      const dest = moveFile(file, result.destination, dryRun);
+      if (dryRun) {
+        log("info", `MATCHED ${file} -> ${dest} (rule: ${result.ruleName}, dry_run=true)`);
+      } else {
+        log("info", `MOVED ${file} -> ${dest} (rule: ${result.ruleName})`);
+      }
+      summary.matched++;
+    } catch (e) {
+      log("error", `FAILED to move ${file} -> ${result.destination}: ${e}`);
+      scanStats.errors++;
+    }
   }
+  log(
+    "info",
+    `Scan summary: found=${summary.found} matched=${summary.matched} skipped=${summary.skipped} errors=${scanStats.errors}`
+  );
   log("info", "Scan complete.");
   process.exit(0);
 }
