@@ -1,7 +1,7 @@
 [watch]
 paths = [
-  "C:\\Users\\sina\\Downloads",
-  "C:\\Users\\sina\\Desktop"
+  "%USERPROFILE%\\Downloads",
+  "%USERPROFILE%\\Desktop"
 ]
 
 [safety]
