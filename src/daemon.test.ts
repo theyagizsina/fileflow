@@ -16,24 +16,17 @@ function setup(opts: {
   processDelay?: number;
   existsFn?: (p: string) => boolean;
   accessibleFn?: (p: string) => boolean;
-  ignoreExtensions?: string[];
+  hasTempExtensionFn?: (p: string) => boolean;
 }) {
   const calls: string[] = [];
   const stabilityDelayMs = opts.stabilityDelayMs ?? 50;
   const processDelay = opts.processDelay ?? 0;
 
-  // Track when processing starts/ends for concurrency verification
-  let activeProcessing = 0;
-  let maxConcurrent = 0;
-
   const processFileFn = async (path: string) => {
     calls.push(path);
-    activeProcessing++;
-    if (activeProcessing > maxConcurrent) maxConcurrent = activeProcessing;
     if (processDelay > 0) {
       await new Promise((r) => setTimeout(r, processDelay));
     }
-    activeProcessing--;
   };
 
   // Controllable sleep that actually waits (but short)
@@ -41,7 +34,7 @@ function setup(opts: {
 
   const handler = createEventHandler({
     stabilityDelayMs,
-    ignoreExtensions: opts.ignoreExtensions ?? [],
+    hasTempExtensionFn: opts.hasTempExtensionFn ?? (() => false),
     processFile: processFileFn,
     existsFn: opts.existsFn ?? (() => true),
     accessibleFn: opts.accessibleFn ?? (() => true),
@@ -50,7 +43,7 @@ function setup(opts: {
     retryQueue: { add: () => {} },
   });
 
-  return { handler, calls, getMaxConcurrent: () => maxConcurrent };
+  return { handler, calls };
 }
 
 function makeEvent(path: string): FileEvent {
@@ -146,7 +139,7 @@ describe("daemon event handler", () => {
 
       const handler = createEventHandler({
         stabilityDelayMs,
-        ignoreExtensions: [],
+        hasTempExtensionFn: () => false,
         processFile: async (path: string) => {
           callCount++;
           if (callCount === 1) {
@@ -181,7 +174,7 @@ describe("daemon event handler", () => {
     test("skips files with temp extensions", async () => {
       const { handler, calls } = setup({
         stabilityDelayMs: 30,
-        ignoreExtensions: [".tmp", ".crdownload"],
+        hasTempExtensionFn: (p: string) => p.endsWith(".tmp") || p.endsWith(".crdownload"),
       });
 
       handler(makeEvent("/test/file.tmp"));
@@ -211,7 +204,7 @@ describe("daemon event handler", () => {
       const queued: string[] = [];
       const handler = createEventHandler({
         stabilityDelayMs: 30,
-        ignoreExtensions: [],
+        hasTempExtensionFn: () => false,
         processFile: async () => {},
         existsFn: () => true,
         accessibleFn: () => false,
@@ -229,7 +222,7 @@ describe("daemon event handler", () => {
   });
 
   describe("recentEvents cleanup", () => {
-    test("cleans old entries when map exceeds 1000", async () => {
+    test("handler works correctly with many distinct paths", async () => {
       // This tests that the cleanup logic doesn't crash and handler still works.
       // We can't easily verify internal map size, but we can verify functionality.
       const { handler, calls } = setup({ stabilityDelayMs: 10 });

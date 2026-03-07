@@ -2,7 +2,7 @@ import type { FileEvent } from "./watcher";
 
 export interface EventHandlerDeps {
   stabilityDelayMs: number;
-  ignoreExtensions: string[];
+  hasTempExtensionFn: (path: string) => boolean;
   processFile: (path: string) => void | Promise<void>;
   existsFn: (path: string) => boolean;
   accessibleFn: (path: string) => boolean;
@@ -14,7 +14,7 @@ export interface EventHandlerDeps {
 export function createEventHandler(deps: EventHandlerDeps): (event: FileEvent) => void {
   const {
     stabilityDelayMs,
-    ignoreExtensions,
+    hasTempExtensionFn,
     processFile,
     existsFn,
     accessibleFn,
@@ -43,8 +43,7 @@ export function createEventHandler(deps: EventHandlerDeps): (event: FileEvent) =
     }
 
     // Check temp extensions before acquiring in-flight lock
-    const ext = event.path.split(".").pop()?.toLowerCase();
-    if (ext && ignoreExtensions.some((ie) => ie.toLowerCase() === `.${ext}`)) {
+    if (hasTempExtensionFn(event.path)) {
       logFn("info", `SKIPPED ${event.path} (reason: temp_extension)`);
       return;
     }

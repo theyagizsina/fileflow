@@ -117,7 +117,7 @@ const retryInterval = config.safety.retry_interval_seconds * 1000;
 
 const handleEvent = createEventHandler({
   stabilityDelayMs: stabilityDelay,
-  ignoreExtensions: config.safety.ignore_extensions,
+  hasTempExtensionFn: (path) => hasTempExtension(path, config.safety.ignore_extensions),
   processFile: async (path) => processFile(path),
   existsFn: existsSync,
   accessibleFn: isFileAccessible,
