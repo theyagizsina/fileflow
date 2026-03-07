@@ -53,7 +53,7 @@ export function loadConfig(path: string): Config {
       name: r.name,
       type: r.type,
       match: r.match,
-      destination: r.destination,
+      destination: expandEnvVars(r.destination),
     })),
   };
 }

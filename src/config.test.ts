@@ -79,4 +79,33 @@ destination = "W:\\\\Media\\\\Videos"
     expect(config.rules[1].type).toBe("extension");
     rmSync(tmpDir, { recursive: true, force: true });
   });
+
+  test("expands env vars in rule destinations", () => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    mkdirSync(tmpDir, { recursive: true });
+
+    process.env.FILEFLOW_TEST_DEST = "C:\\Users\\testuser";
+    const configPath = join(tmpDir, "envdest.toml");
+    writeFileSync(configPath, `
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[safety]
+ignore_extensions = [".tmp"]
+
+[logging]
+path = "fileflow.log"
+
+[[rules]]
+name = "Archives"
+type = "extension"
+match = [".zip", ".rar"]
+destination = "%FILEFLOW_TEST_DEST%\\\\Documents\\\\Archives"
+`);
+    const config = loadConfig(configPath);
+    expect(config.rules[0].destination).toBe("C:\\Users\\testuser\\Documents\\Archives");
+
+    delete process.env.FILEFLOW_TEST_DEST;
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
 });
