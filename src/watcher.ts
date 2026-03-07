@@ -18,7 +18,7 @@ export type FileEventCallback = (event: FileEvent) => void;
 export function startWatching(paths: string[], callback: FileEventCallback): void {
   for (const dir of paths) {
     try {
-      watch(dir, (eventType, filename) => {
+      watch(dir, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
         const fullPath = join(dir, filename);
 
