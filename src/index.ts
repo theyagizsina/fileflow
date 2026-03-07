@@ -7,6 +7,7 @@ import { hasTempExtension, isFileAccessible, RetryQueue } from "./safety";
 import { moveFile } from "./mover";
 import { initLogger, log } from "./logger";
 import { startWatching, scanExisting } from "./watcher";
+import { createEventHandler } from "./daemon";
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -114,39 +115,18 @@ const retryQueue = new RetryQueue(config.safety.max_retries);
 const stabilityDelay = config.safety.stability_delay_seconds * 1000;
 const retryInterval = config.safety.retry_interval_seconds * 1000;
 
-// Deduplicate events (fs.watch fires multiple times per file)
-const recentEvents = new Map<string, number>();
-
-startWatching(watchPaths, async (event) => {
-  const now = Date.now();
-  const lastSeen = recentEvents.get(event.path);
-  if (lastSeen && now - lastSeen < stabilityDelay) return;
-  recentEvents.set(event.path, now);
-
-  // Clean old entries periodically
-  if (recentEvents.size > 1000) {
-    for (const [key, time] of recentEvents) {
-      if (now - time > 60000) recentEvents.delete(key);
-    }
-  }
-
-  if (hasTempExtension(event.path, config.safety.ignore_extensions)) {
-    log("info", `SKIPPED ${event.path} (reason: temp_extension)`);
-    return;
-  }
-
-  // Stability delay
-  await Bun.sleep(stabilityDelay);
-
-  if (!existsSync(event.path)) return;
-
-  if (isFileAccessible(event.path)) {
-    processFile(event.path);
-  } else {
-    log("info", `QUEUED ${event.path} (reason: file_locked)`);
-    retryQueue.add(event.path);
-  }
+const handleEvent = createEventHandler({
+  stabilityDelayMs: stabilityDelay,
+  ignoreExtensions: config.safety.ignore_extensions,
+  processFile: async (path) => processFile(path),
+  existsFn: existsSync,
+  accessibleFn: isFileAccessible,
+  sleepFn: (ms) => Bun.sleep(ms),
+  logFn: log,
+  retryQueue,
 });
+
+startWatching(watchPaths, handleEvent);
 
 // Retry timer
 setInterval(() => {
