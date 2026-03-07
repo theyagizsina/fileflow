@@ -81,14 +81,15 @@ export function moveFile(source: string, destDir: string, dryRun: boolean): stri
 
   const finalDest = uniqueDestination(destDir, fileName);
 
-  if (dryRun) {
-    log("info", `[DRY-RUN] WOULD MOVE ${source} -> ${finalDest}`);
-    return finalDest;
-  }
-
-  // Reserve this destination path to prevent concurrent moves from claiming it
+  // Reserve destination immediately to close TOCTOU gap between
+  // uniqueDestination returning and the actual move starting.
   activeMoves.add(finalDest);
   try {
+    if (dryRun) {
+      log("info", `[DRY-RUN] WOULD MOVE ${source} -> ${finalDest}`);
+      return finalDest;
+    }
+
     try {
       fs.renameSync(source, finalDest);
     } catch (err: any) {
@@ -96,9 +97,9 @@ export function moveFile(source: string, destDir: string, dryRun: boolean): stri
       if (err?.code !== "EXDEV") throw err;
       crossDriveMove(source, finalDest);
     }
+
+    return finalDest;
   } finally {
     activeMoves.delete(finalDest);
   }
-
-  return finalDest;
 }
