@@ -152,7 +152,21 @@ describe("crossDriveMove", () => {
     const logSpy = spyOn(logger, "log");
 
     try {
-      expect(() => crossDriveMove(source, dest)).toThrow(/EBUSY|resource busy/i);
+      let thrownError: Error | undefined;
+      try {
+        crossDriveMove(source, dest);
+      } catch (e) {
+        thrownError = e as Error;
+      }
+
+      // Error must have been thrown
+      expect(thrownError).toBeDefined();
+      // Error message must contain both paths
+      expect(thrownError!.message).toContain(source);
+      expect(thrownError!.message).toContain(dest);
+      // Original error preserved as cause
+      expect(thrownError!.cause).toBeInstanceOf(Error);
+      expect((thrownError!.cause as Error).message).toContain("EBUSY");
 
       // Destination should still exist (copy succeeded)
       expect(existsSync(dest)).toBe(true);

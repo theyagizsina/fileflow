@@ -58,7 +58,10 @@ export function crossDriveMove(source: string, dest: string): void {
       "warn",
       `Failed to delete source after copy — duplicate files exist: source=${source} dest=${dest}`
     );
-    throw unlinkErr;
+    throw new Error(
+      `Failed to delete source after copy — duplicate files exist: source=${source} dest=${dest}`,
+      { cause: unlinkErr }
+    );
   }
 }
 
@@ -78,8 +81,9 @@ export function moveFile(source: string, destDir: string, dryRun: boolean): stri
 
   try {
     fs.renameSync(source, finalDest);
-  } catch {
-    // Cross-drive: rename fails, fallback to safe copy+delete
+  } catch (err: any) {
+    // Only fallback to copy+delete for cross-device errors
+    if (err?.code !== "EXDEV") throw err;
     crossDriveMove(source, finalDest);
   }
 
