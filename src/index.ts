@@ -10,6 +10,7 @@ import { startWatching, scanExisting } from "./watcher";
 import { createEventHandler } from "./daemon";
 import { installStartupTask, uninstallStartupTask, isInstalled, createSchtasksAdapter } from "./scheduler";
 import { getStatus } from "./status";
+import { runValidation } from "./validate";
 
 const VERSION = "0.1.0";
 
@@ -23,6 +24,7 @@ const { values } = parseArgs({
     install: { type: "boolean", default: false },
     uninstall: { type: "boolean", default: false },
     status: { type: "boolean", default: false },
+    validate: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
   },
@@ -46,6 +48,7 @@ Options:
   --install         Register as startup task (Task Scheduler)
   --uninstall       Remove startup task
   --status          Show current configuration and status
+  --validate        Validate config, paths, and permissions
   --help, -h        Show this help message
   --version, -v     Show version number`);
   process.exit(0);
@@ -112,6 +115,27 @@ if (values.status) {
   });
   console.log(output);
   process.exit(0);
+}
+
+if (values.validate) {
+  const watchPaths = expandedWatchPaths(config);
+  const result = runValidation({
+    configPath,
+    watchPaths,
+    rules: config.rules,
+    pathExists: existsSync,
+    isWritable: (p: string) => {
+      try {
+        const fs = require("fs");
+        fs.accessSync(p, fs.constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  });
+  console.log(result.report);
+  process.exit(result.ok ? 0 : 1);
 }
 
 initLogger(config.logging);

@@ -212,4 +212,42 @@ destination = "${dir.replace(/\\/g, "\\\\")}"
     expect(output).toContain(configPath);
     expect(output).toContain("Rules:");
   });
+
+  test("--validate passes with valid config", async () => {
+    const dir = setup("validate_pass");
+    const watchDir = join(dir, "watch");
+    const destDir = join(dir, "dest");
+    mkdirSync(watchDir, { recursive: true });
+    mkdirSync(destDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], destDir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${destDir.replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts --validate --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("PASS");
+  });
+
+  test("--validate fails with missing destination", async () => {
+    const dir = setup("validate_fail");
+    const watchDir = join(dir, "watch");
+    mkdirSync(watchDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], dir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${join(dir, "nonexistent").replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts --validate --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(1);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("FAIL");
+  });
 });
