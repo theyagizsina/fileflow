@@ -9,6 +9,21 @@ export function hasTempExtension(filePath: string, ignoreExtensions: string[]): 
 }
 
 export function isFileAccessible(filePath: string): boolean {
+  // Phase 1: Try read-write open to detect exclusive locks (e.g. file still being written)
+  try {
+    const fd = openSync(filePath, "r+");
+    closeSync(fd);
+    return true;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    // EACCES/EPERM = read-only file, not a lock — fall through to phase 2
+    if (code !== "EACCES" && code !== "EPERM") {
+      // EBUSY, ENOENT, or other errors = truly inaccessible
+      return false;
+    }
+  }
+
+  // Phase 2: File is read-only (r+ failed with EACCES/EPERM). Verify it's actually readable.
   try {
     const fd = openSync(filePath, "r");
     closeSync(fd);

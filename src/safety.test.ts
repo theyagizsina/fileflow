@@ -46,6 +46,10 @@ describe("isFileAccessible", () => {
     chmodSync(file, 0o666);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  test("returns false for non-existent file", () => {
+    expect(isFileAccessible("/tmp/fileflow_nonexistent_file_abc123.txt")).toBe(false);
+  });
 });
 
 describe("RetryQueue", () => {
