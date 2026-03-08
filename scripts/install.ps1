@@ -31,6 +31,24 @@ function Get-ReleaseAssetUrl {
   return "https://github.com/$RepoOwner/$RepoName/releases/download/$v/$AssetName"
 }
 
+function Get-LatestReleaseVersion {
+  param(
+    [Parameter(Mandatory = $true)][string]$RepoOwner,
+    [Parameter(Mandatory = $true)][string]$RepoName
+  )
+
+  $url = "https://api.github.com/repos/$RepoOwner/$RepoName/releases/latest"
+  try {
+    $release = Invoke-RestMethod -Uri $url -Headers @{ "User-Agent" = "FileFlow-Installer" }
+    if ($null -eq $release -or [string]::IsNullOrWhiteSpace($release.tag_name)) {
+      throw "Latest release did not include a tag_name."
+    }
+    return $release.tag_name
+  } catch {
+    throw "Could not resolve latest release version from $RepoOwner/$RepoName. Provide -Version explicitly. Error: $_"
+  }
+}
+
 function Add-UserPathEntry {
   param([Parameter(Mandatory = $true)][string]$Entry)
 
@@ -244,21 +262,16 @@ function Install-FileFlow {
     [switch]$NonInteractive
   )
 
-  if ([string]::IsNullOrWhiteSpace($Version)) {
-    if ($NonInteractive) {
-      throw "Version is required in non-interactive mode."
-    }
-    $Version = Read-Host "Release version (example: v0.1.0-alpha.1)"
-    if ([string]::IsNullOrWhiteSpace($Version)) {
-      throw "Version is required."
-    }
-  }
-
   if ([string]::IsNullOrWhiteSpace($RepoOwner)) {
     $RepoOwner = "theyagizsina"
   }
   if ([string]::IsNullOrWhiteSpace($RepoName)) {
     $RepoName = "fileflow"
+  }
+
+  if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Get-LatestReleaseVersion -RepoOwner $RepoOwner -RepoName $RepoName
+    Write-Host "Version not provided. Using latest release: $Version"
   }
 
   if (-not $NonInteractive) {

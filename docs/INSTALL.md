@@ -6,10 +6,10 @@ Note: repository owner/name are configurable in the installer via `-RepoOwner` a
 
 ## Quick Install
 
-Run in PowerShell (replace version as needed):
+Run in PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/theyagizsina/fileflow/v0.1.0-alpha.1/scripts/install.ps1 | iex; Install-FileFlow -Version v0.1.0-alpha.1
+irm https://raw.githubusercontent.com/theyagizsina/fileflow/v0.1.0-alpha.1/scripts/install.ps1 | iex; Install-FileFlow
 ```
 
 Interactive mode is now the default. If parameters are missing, installer prompts you in terminal.
@@ -41,10 +41,10 @@ fileflow --version
 If you already downloaded the repo/scripts:
 
 ```powershell
-.\scripts\install.ps1 -Version v0.1.0-alpha.1
+.\scripts\install.ps1
 ```
 
-`-Version` is required.
+If `-Version` is not provided, installer resolves the latest GitHub release automatically.
 
 ### Custom install paths
 
