@@ -91,6 +91,7 @@ Config format is TOML. Main sections:
 - `[safety]` - temp extensions, delays, retry settings
 - `[logging]` - log path, max size, rotation
 - `[[rules]]` - ordered classification rules
+- `[projects]` - project creation settings (see [Project Creator](docs/project-creator.md))
 
 Default config template: `default_config.toml`
 
@@ -113,18 +114,28 @@ destination = "%USERPROFILE%\\FileFlow\\Downloads\\Documents"
 ## CLI
 
 ```text
---config <path>   Config file path (default: fileflow.toml)
---scan-once       Scan existing files and exit
---dry-run         Show what would be moved without moving
---init            Create default config file
---install         Register as startup task (Task Scheduler)
---uninstall       Remove startup task
---status          Show current configuration and status
---validate        Validate config, paths, and permissions
---explain <file>  Show which rule matches a file and why
---help, -h        Show help
---version, -v     Show version
+Usage: fileflow [options]
+       fileflow create <name> [options]
+
+Commands:
+  create <name>     Create a new project under projects.root
+
+Options:
+  --config <path>   Config file path (default: fileflow.toml)
+  --scan-once       Scan existing files and exit
+  --dry-run         Show what would be moved without moving
+  --init            Create default config file
+  --install         Register as startup task (Task Scheduler)
+  --uninstall       Remove startup task
+  --status          Show current configuration and status
+  --validate        Validate config, paths, and permissions
+  --explain <file>  Show which rule matches a file and why
+  --yes, -y         Auto-confirm shell actions in create
+  --help, -h        Show help
+  --version, -v     Show version
 ```
+
+For details on the create command and blueprint configuration, see [Project Creator docs](docs/project-creator.md).
 
 ## Safety Guarantees
 
@@ -152,6 +163,9 @@ Rotation keeps numbered log files (up to 3 rotated files).
 - `src/watcher.ts` - file watch + scan helpers
 - `src/daemon.ts` - event pipeline and retry integration
 - `src/logger.ts` - logging + rotation
+- `src/blueprints.ts` - blueprint JSON loader + validation
+- `src/creator.ts` - project creation flow engine
+- `project-blueprints.schema.json` - JSON Schema for blueprint config
 
 ## Development
 
