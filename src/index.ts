@@ -12,8 +12,12 @@ import { installStartupTask, uninstallStartupTask, isInstalled, createSchtasksAd
 import { getStatus } from "./status";
 import { runValidation } from "./validate";
 import { explainFile } from "./explain";
+import { checkForUpdate, performUpdate, cleanupOldBinary } from "./updater";
 
 const VERSION = "0.1.0";
+
+// Clean up leftover .old binary from a previous update
+cleanupOldBinary(resolve(process.argv[0]!));
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -26,6 +30,7 @@ const { values } = parseArgs({
     uninstall: { type: "boolean", default: false },
     status: { type: "boolean", default: false },
     validate: { type: "boolean", default: false },
+    update: { type: "boolean", default: false },
     explain: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
@@ -51,9 +56,40 @@ Options:
   --uninstall       Remove startup task
   --status          Show current configuration and status
   --validate        Validate config, paths, and permissions
+  --update          Update to latest version
   --explain <file>  Show which rule matches a file and why
   --help, -h        Show this help message
   --version, -v     Show version number`);
+  process.exit(0);
+}
+
+if (values.update) {
+  const exePath = resolve(process.argv[0]!);
+  console.log(`Current version: ${VERSION}`);
+  console.log("Checking for updates...");
+  try {
+    const result = await checkForUpdate({
+      currentVersion: VERSION,
+      fetchFn: fetch,
+      repoOwner: "theyagizsina",
+      repoName: "fileflow",
+    });
+    if (!result.available) {
+      console.log("Already up to date.");
+      process.exit(0);
+    }
+    console.log(`v${result.latestVersion} available`);
+    console.log("Downloading fileflow.exe...");
+    await performUpdate({
+      exePath,
+      downloadUrl: result.downloadUrl!,
+      fetchFn: fetch,
+    });
+    console.log(`Updated to v${result.latestVersion}. Restart fileflow to use the new version.`);
+  } catch (e) {
+    console.error(`Update failed: ${e}`);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
