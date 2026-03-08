@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,6 +28,12 @@ jobs:
 
       - name: Build executable
         run: bun build src/index.ts --compile --outfile fileflow.exe
+
+      - name: Verify release assets exist
+        run: |
+          if (!(Test-Path "fileflow.exe")) { throw "fileflow.exe was not built" }
+          if (!(Test-Path "scripts/install.ps1")) { throw "scripts/install.ps1 missing" }
+          if (!(Test-Path "scripts/uninstall.ps1")) { throw "scripts/uninstall.ps1 missing" }
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
