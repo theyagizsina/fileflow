@@ -17,6 +17,11 @@ export interface Config {
   };
   notifications: { enabled: boolean };
   rules: Rule[];
+  projects?: {
+    root: string;
+    blueprints?: string;
+    allowed_commands?: string[];
+  };
 }
 
 export interface Rule {
@@ -54,6 +59,26 @@ export function validateConfig(raw: any): void {
   if (safety.max_retries !== undefined) {
     if (typeof safety.max_retries !== "number" || !Number.isInteger(safety.max_retries) || safety.max_retries < 0) {
       throw new Error(`max_retries must be a non-negative integer, got ${safety.max_retries}`);
+    }
+  }
+
+  // Projects validation
+  if (raw.projects !== undefined) {
+    if (typeof raw.projects.root !== "string" || raw.projects.root.trim() === "") {
+      throw new Error("projects.root must be a non-empty string");
+    }
+    if (
+      raw.projects.blueprints !== undefined &&
+      (typeof raw.projects.blueprints !== "string" || raw.projects.blueprints.trim() === "")
+    ) {
+      throw new Error("projects.blueprints must be a non-empty string");
+    }
+    if (
+      raw.projects.allowed_commands !== undefined &&
+      (!Array.isArray(raw.projects.allowed_commands) ||
+        !raw.projects.allowed_commands.every((c: unknown) => typeof c === "string"))
+    ) {
+      throw new Error("projects.allowed_commands must be an array of strings");
     }
   }
 
@@ -110,6 +135,13 @@ export function loadConfig(path: string): Config {
       match: r.match,
       destination: expandEnvVars(r.destination),
     })),
+    projects: raw.projects
+      ? {
+          root: expandEnvVars(raw.projects.root),
+          blueprints: raw.projects.blueprints,
+          allowed_commands: raw.projects.allowed_commands,
+        }
+      : undefined,
   };
 }
 
