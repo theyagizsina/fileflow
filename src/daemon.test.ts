@@ -221,6 +221,32 @@ describe("daemon event handler", () => {
     });
   });
 
+  describe("retry on processFile failure", () => {
+    test("adds path to retryQueue when processFile throws", async () => {
+      const queued: string[] = [];
+      const stabilityDelayMs = 30;
+
+      const handler = createEventHandler({
+        stabilityDelayMs,
+        hasTempExtensionFn: () => false,
+        processFile: async (_path: string) => {
+          throw new Error("destination unavailable");
+        },
+        existsFn: () => true,
+        accessibleFn: () => true,
+        sleepFn: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+        logFn: () => {},
+        retryQueue: { add: (p: string) => queued.push(p) },
+      });
+
+      handler(makeEvent("/test/file.txt"));
+
+      await new Promise((r) => setTimeout(r, stabilityDelayMs + 50));
+
+      expect(queued).toEqual(["/test/file.txt"]);
+    });
+  });
+
   describe("recentEvents cleanup", () => {
     test("handler works correctly with many distinct paths", async () => {
       // This tests that the cleanup logic doesn't crash and handler still works.

@@ -68,6 +68,7 @@ export function createEventHandler(deps: EventHandlerDeps): (event: FileEvent) =
         }
       } catch (e) {
         logFn("error", `FAILED processing ${event.path}: ${e}`);
+        retryQueue.add(event.path);
       } finally {
         inFlightPaths.delete(event.path);
       }

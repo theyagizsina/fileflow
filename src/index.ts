@@ -66,6 +66,7 @@ function processFile(filePath: string): void {
     log("info", `MOVED ${filePath} -> ${dest} (rule: ${result.ruleName})`);
   } catch (e) {
     log("error", `FAILED to move ${filePath} -> ${result.destination}: ${e}`);
+    throw e;
   }
 }
 
@@ -133,7 +134,11 @@ setInterval(() => {
   const ready = retryQueue.drainReady();
   for (const path of ready) {
     log("info", `RETRY ${path}`);
-    processFile(path);
+    try {
+      processFile(path);
+    } catch {
+      retryQueue.add(path);
+    }
   }
 }, retryInterval);
 
