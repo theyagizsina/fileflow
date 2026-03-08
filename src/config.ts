@@ -118,8 +118,96 @@ export function expandedWatchPaths(config: Config): string[] {
 }
 
 export function defaultConfigToml(): string {
-  const path = require("path");
-  return readFileSync(path.join(__dirname, "..", "default_config.toml"), "utf-8");
+  return `[watch]
+paths = [
+  "%USERPROFILE%\\\\Downloads",
+  "%USERPROFILE%\\\\Desktop"
+]
+
+[safety]
+ignore_extensions = [".tmp", ".crdownload", ".part", ".partial", ".download", ".opdownload"]
+stability_delay_seconds = 3
+retry_interval_seconds = 10
+max_retries = 30
+
+[logging]
+path = "%LOCALAPPDATA%\\\\FileFlow\\\\fileflow.log"
+max_size_mb = 10
+rotate = true
+
+[notifications]
+enabled = false
+
+# --- Rules ---
+# Rules are evaluated top to bottom. First match wins.
+# Types: "pattern" (filename glob) or "extension"
+
+[[rules]]
+name = "Screenshots"
+type = "pattern"
+match = ["Screenshot*", "Screen Shot*", "Ekran g\\u00F6r\\u00FCnt\\u00FCs\\u00FC*", "Clipboard*", "Snipaste*", "ShareX*", "Lightshot*", "Greenshot*"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Media\\\\Screenshots"
+
+[[rules]]
+name = "Photos"
+type = "pattern"
+match = ["IMG_*", "DSC_*", "DCIM*", "PXL_*", "DSCF*", "Photo*"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Media\\\\Images"
+
+[[rules]]
+name = "Design Files"
+type = "extension"
+match = [".fig", ".xd", ".sketch", ".psd", ".ai", ".indd", ".afdesign", ".afphoto"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Design"
+
+[[rules]]
+name = "Videos"
+type = "extension"
+match = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Media\\\\Videos"
+
+[[rules]]
+name = "Audio"
+type = "extension"
+match = [".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Media\\\\Audio"
+
+[[rules]]
+name = "Images"
+type = "extension"
+match = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg", ".ico", ".raw", ".cr2", ".nef"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Media\\\\Images"
+
+[[rules]]
+name = "Documents"
+type = "extension"
+match = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".txt", ".rtf", ".csv"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Downloads\\\\Documents"
+
+[[rules]]
+name = "Archives"
+type = "extension"
+match = [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Downloads\\\\Archives"
+
+[[rules]]
+name = "Code"
+type = "extension"
+match = [".js", ".ts", ".py", ".html", ".css", ".json", ".yaml", ".yml", ".xml", ".sql", ".sh", ".bat", ".ps1", ".rb", ".go", ".rs", ".java", ".c", ".cpp", ".h", ".php", ".swift", ".kt", ".lua", ".r", ".md"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Downloads\\\\Code"
+
+[[rules]]
+name = "Fonts"
+type = "extension"
+match = [".ttf", ".otf", ".woff", ".woff2", ".eot"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Downloads\\\\Fonts"
+
+[[rules]]
+name = "Setup"
+type = "extension"
+match = [".exe", ".msi", ".appx", ".msix", ".iso", ".img"]
+destination = "%USERPROFILE%\\\\FileFlow\\\\Downloads\\\\Setup"
+`;
 }
 
 export function resolveConfigPath(

@@ -17,7 +17,7 @@ import { checkForUpdate, performUpdate, cleanupOldBinary } from "./updater";
 const VERSION = "0.1.0";
 
 // Clean up leftover .old binary from a previous update
-cleanupOldBinary(resolve(process.argv[0]!));
+cleanupOldBinary(resolve(process.execPath));
 
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
@@ -64,7 +64,7 @@ Options:
 }
 
 if (values.update) {
-  const exePath = resolve(process.argv[0]!);
+  const exePath = resolve(process.execPath);
   console.log(`Current version: ${VERSION}`);
   console.log("Checking for updates...");
   try {
@@ -109,7 +109,7 @@ if (init) {
 }
 
 if (values.install) {
-  const exePath = resolve(process.argv[0]!);
+  const exePath = resolve(process.execPath);
   const adapter = createSchtasksAdapter();
   try {
     const msg = installStartupTask({ exePath, configPath, adapter });
