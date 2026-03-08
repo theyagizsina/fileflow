@@ -9,6 +9,8 @@ import { initLogger, log } from "./logger";
 import { startWatching, scanExisting } from "./watcher";
 import { createEventHandler } from "./daemon";
 
+const VERSION = "0.1.0";
+
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
@@ -16,8 +18,30 @@ const { values } = parseArgs({
     "dry-run": { type: "boolean", default: false },
     "scan-once": { type: "boolean", default: false },
     init: { type: "boolean", default: false },
+    help: { type: "boolean", short: "h", default: false },
+    version: { type: "boolean", short: "v", default: false },
   },
 });
+
+if (values.version) {
+  console.log(`fileflow ${VERSION}`);
+  process.exit(0);
+}
+
+if (values.help) {
+  console.log(`fileflow ${VERSION} — automatic file organizer daemon
+
+Usage: fileflow [options]
+
+Options:
+  --config <path>   Config file path (default: fileflow.toml)
+  --scan-once       Scan existing files and exit
+  --dry-run         Show what would be moved without moving
+  --init            Create default config file
+  --help, -h        Show this help message
+  --version, -v     Show version number`);
+  process.exit(0);
+}
 
 const configPath = resolve(values.config!);
 const dryRun = values["dry-run"]!;
