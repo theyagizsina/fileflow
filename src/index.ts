@@ -8,7 +8,8 @@ import { moveFile } from "./mover";
 import { initLogger, log } from "./logger";
 import { startWatching, scanExisting } from "./watcher";
 import { createEventHandler } from "./daemon";
-import { installStartupTask, uninstallStartupTask, createSchtasksAdapter } from "./scheduler";
+import { installStartupTask, uninstallStartupTask, isInstalled, createSchtasksAdapter } from "./scheduler";
+import { getStatus } from "./status";
 
 const VERSION = "0.1.0";
 
@@ -21,6 +22,7 @@ const { values } = parseArgs({
     init: { type: "boolean", default: false },
     install: { type: "boolean", default: false },
     uninstall: { type: "boolean", default: false },
+    status: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
   },
@@ -43,6 +45,7 @@ Options:
   --init            Create default config file
   --install         Register as startup task (Task Scheduler)
   --uninstall       Remove startup task
+  --status          Show current configuration and status
   --help, -h        Show this help message
   --version, -v     Show version number`);
   process.exit(0);
@@ -95,6 +98,22 @@ if (!existsSync(configPath)) {
 }
 
 const config = loadConfig(configPath);
+
+if (values.status) {
+  const adapter = createSchtasksAdapter();
+  const watchPaths = expandedWatchPaths(config);
+  const output = getStatus({
+    configPath,
+    watchPaths,
+    logPath: config.logging.path,
+    rulesCount: config.rules.length,
+    dryRun,
+    isSchedulerInstalled: () => isInstalled({ adapter }),
+  });
+  console.log(output);
+  process.exit(0);
+}
+
 initLogger(config.logging);
 
 log("info", "FileFlow starting...");

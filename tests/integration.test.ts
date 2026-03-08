@@ -192,4 +192,24 @@ destination = "${destDir.replace(/\\/g, "\\\\")}"
     expect(output).toContain("--install");
     expect(output).toContain("--uninstall");
   });
+
+  test("--status shows config and watch paths", async () => {
+    const dir = setup("status");
+    const watchDir = join(dir, "watch");
+    mkdirSync(watchDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], dir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${dir.replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts --status --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("FileFlow Status");
+    expect(output).toContain(configPath);
+    expect(output).toContain("Rules:");
+  });
 });
