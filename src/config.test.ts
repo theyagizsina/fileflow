@@ -75,8 +75,8 @@ destination = "W:\\\\Media\\\\Videos"
 `);
     const config = loadConfig(configPath);
     expect(config.rules).toHaveLength(2);
-    expect(config.rules[0].type).toBe("pattern");
-    expect(config.rules[1].type).toBe("extension");
+    expect(config.rules[0]!.type).toBe("pattern");
+    expect(config.rules[1]!.type).toBe("extension");
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -103,7 +103,7 @@ match = [".zip", ".rar"]
 destination = "%FILEFLOW_TEST_DEST%\\\\Documents\\\\Archives"
 `);
     const config = loadConfig(configPath);
-    expect(config.rules[0].destination).toBe("C:\\Users\\testuser\\Documents\\Archives");
+    expect(config.rules[0]!.destination).toBe("C:\\Users\\testuser\\Documents\\Archives");
 
     delete process.env.FILEFLOW_TEST_DEST;
     rmSync(tmpDir, { recursive: true, force: true });
