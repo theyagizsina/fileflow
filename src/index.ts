@@ -8,6 +8,7 @@ import { moveFile } from "./mover";
 import { initLogger, log } from "./logger";
 import { startWatching, scanExisting } from "./watcher";
 import { createEventHandler } from "./daemon";
+import { installStartupTask, uninstallStartupTask, createSchtasksAdapter } from "./scheduler";
 
 const VERSION = "0.1.0";
 
@@ -18,6 +19,8 @@ const { values } = parseArgs({
     "dry-run": { type: "boolean", default: false },
     "scan-once": { type: "boolean", default: false },
     init: { type: "boolean", default: false },
+    install: { type: "boolean", default: false },
+    uninstall: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
   },
@@ -38,6 +41,8 @@ Options:
   --scan-once       Scan existing files and exit
   --dry-run         Show what would be moved without moving
   --init            Create default config file
+  --install         Register as startup task (Task Scheduler)
+  --uninstall       Remove startup task
   --help, -h        Show this help message
   --version, -v     Show version number`);
   process.exit(0);
@@ -56,6 +61,31 @@ if (init) {
   writeFileSync(configPath, defaultConfigToml());
   console.log(`Created default config: ${configPath}`);
   process.exit(0);
+}
+
+if (values.install) {
+  const exePath = resolve(process.argv[0]!);
+  const adapter = createSchtasksAdapter();
+  try {
+    const msg = installStartupTask({ exePath, configPath, adapter });
+    console.log(msg);
+    process.exit(0);
+  } catch (e) {
+    console.error(`Failed to install startup task: ${e}`);
+    process.exit(1);
+  }
+}
+
+if (values.uninstall) {
+  const adapter = createSchtasksAdapter();
+  try {
+    const msg = uninstallStartupTask({ adapter });
+    console.log(msg);
+    process.exit(0);
+  } catch (e) {
+    console.error(`Failed to uninstall startup task: ${e}`);
+    process.exit(1);
+  }
 }
 
 if (!existsSync(configPath)) {

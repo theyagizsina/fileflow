@@ -184,4 +184,12 @@ destination = "${destDir.replace(/\\/g, "\\\\")}"
     expect(existsSync(join(destDir, "nested_doc.pdf"))).toBe(true);
     expect(existsSync(join(nestedDir, "nested_doc.pdf"))).toBe(false);
   });
+
+  test("--help includes install and uninstall options", async () => {
+    const result = await $`bun run src/index.ts --help`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("--install");
+    expect(output).toContain("--uninstall");
+  });
 });
