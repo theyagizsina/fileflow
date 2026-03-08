@@ -11,6 +11,7 @@ import { createEventHandler } from "./daemon";
 import { installStartupTask, uninstallStartupTask, isInstalled, createSchtasksAdapter } from "./scheduler";
 import { getStatus } from "./status";
 import { runValidation } from "./validate";
+import { explainFile } from "./explain";
 
 const VERSION = "0.1.0";
 
@@ -25,6 +26,7 @@ const { values } = parseArgs({
     uninstall: { type: "boolean", default: false },
     status: { type: "boolean", default: false },
     validate: { type: "boolean", default: false },
+    explain: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
   },
@@ -49,6 +51,7 @@ Options:
   --uninstall       Remove startup task
   --status          Show current configuration and status
   --validate        Validate config, paths, and permissions
+  --explain <file>  Show which rule matches a file and why
   --help, -h        Show this help message
   --version, -v     Show version number`);
   process.exit(0);
@@ -136,6 +139,16 @@ if (values.validate) {
   });
   console.log(result.report);
   process.exit(result.ok ? 0 : 1);
+}
+
+if (values.explain) {
+  const result = explainFile({
+    filePath: values.explain,
+    rules: config.rules,
+    ignoreExtensions: config.safety.ignore_extensions,
+  });
+  console.log(result.report);
+  process.exit(0);
 }
 
 initLogger(config.logging);

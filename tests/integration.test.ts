@@ -250,4 +250,45 @@ destination = "${join(dir, "nonexistent").replace(/\\/g, "\\\\")}"
     const output = Buffer.from(result.stdout).toString("utf-8");
     expect(output).toContain("FAIL");
   });
+
+  test("--explain shows matching rule", async () => {
+    const dir = setup("explain_match");
+    const watchDir = join(dir, "watch");
+    const destDir = join(dir, "dest");
+    mkdirSync(watchDir, { recursive: true });
+    mkdirSync(destDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], destDir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${destDir.replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts --explain report.pdf --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("Docs");
+    expect(output).toContain("MATCH");
+  });
+
+  test("--explain shows no match for unknown extension", async () => {
+    const dir = setup("explain_nomatch");
+    const watchDir = join(dir, "watch");
+    const destDir = join(dir, "dest");
+    mkdirSync(watchDir, { recursive: true });
+    mkdirSync(destDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], destDir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${destDir.replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts --explain random.xyz --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("No rule matched");
+  });
 });
