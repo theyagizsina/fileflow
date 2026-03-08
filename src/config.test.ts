@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { loadConfig, expandEnvVars } from "./config";
+import { loadConfig, expandEnvVars, resolveConfigPath } from "./config";
 import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 
@@ -107,6 +107,41 @@ destination = "%FILEFLOW_TEST_DEST%\\\\Documents\\\\Archives"
 
     delete process.env.FILEFLOW_TEST_DEST;
     rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
+describe("resolveConfigPath", () => {
+  const tmpDir = join(process.env.TEMP || "/tmp", "fileflow_test_resolve");
+
+  function cleanup() {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  test("returns explicit path when provided", () => {
+    const explicit = "C:\\custom\\fileflow.toml";
+    const result = resolveConfigPath(explicit, () => false);
+    expect(result).toBe(explicit);
+  });
+
+  test("returns APPDATA path when it exists and no explicit config given", () => {
+    cleanup();
+    mkdirSync(tmpDir, { recursive: true });
+    const appdataConfig = join(tmpDir, "FileFlow", "fileflow.toml");
+    mkdirSync(join(tmpDir, "FileFlow"), { recursive: true });
+    writeFileSync(appdataConfig, "[watch]\npaths = []");
+
+    const result = resolveConfigPath(undefined, (p: string) => p === appdataConfig, tmpDir);
+    expect(result).toBe(appdataConfig);
+    cleanup();
+  });
+
+  test("falls back to CWD fileflow.toml when APPDATA config does not exist", () => {
+    cleanup();
+    mkdirSync(tmpDir, { recursive: true });
+
+    const result = resolveConfigPath(undefined, () => false, tmpDir);
+    expect(result).toBe("fileflow.toml");
+    cleanup();
   });
 });
 

@@ -1,7 +1,7 @@
 import { parseArgs } from "util";
 import { existsSync, writeFileSync } from "fs";
 import { resolve } from "path";
-import { loadConfig, expandedWatchPaths, defaultConfigToml } from "./config";
+import { loadConfig, expandedWatchPaths, defaultConfigToml, resolveConfigPath } from "./config";
 import { Classifier } from "./classifier";
 import { hasTempExtension, isFileAccessible, RetryQueue } from "./safety";
 import { moveFile } from "./mover";
@@ -18,7 +18,7 @@ const VERSION = "0.1.0";
 const { values } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
-    config: { type: "string", default: "fileflow.toml" },
+    config: { type: "string" },
     "dry-run": { type: "boolean", default: false },
     "scan-once": { type: "boolean", default: false },
     init: { type: "boolean", default: false },
@@ -43,7 +43,7 @@ if (values.help) {
 Usage: fileflow [options]
 
 Options:
-  --config <path>   Config file path (default: fileflow.toml)
+  --config <path>   Config file path (default: %APPDATA%\\FileFlow\\fileflow.toml, then CWD)
   --scan-once       Scan existing files and exit
   --dry-run         Show what would be moved without moving
   --init            Create default config file
@@ -57,7 +57,7 @@ Options:
   process.exit(0);
 }
 
-const configPath = resolve(values.config!);
+const configPath = resolve(resolveConfigPath(values.config, existsSync));
 const dryRun = values["dry-run"]!;
 const scanOnce = values["scan-once"]!;
 const init = values.init!;

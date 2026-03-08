@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import { join } from "path";
 import TOML from "@iarna/toml";
 
 export interface Config {
@@ -119,4 +120,20 @@ export function expandedWatchPaths(config: Config): string[] {
 export function defaultConfigToml(): string {
   const path = require("path");
   return readFileSync(path.join(__dirname, "..", "default_config.toml"), "utf-8");
+}
+
+export function resolveConfigPath(
+  explicit: string | undefined,
+  existsFn: (path: string) => boolean,
+  appdata?: string,
+): string {
+  if (explicit) return explicit;
+
+  const base = appdata ?? process.env.APPDATA ?? "";
+  if (base) {
+    const standard = join(base, "FileFlow", "fileflow.toml");
+    if (existsFn(standard)) return standard;
+  }
+
+  return "fileflow.toml";
 }
