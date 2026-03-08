@@ -1,6 +1,6 @@
 import { parseArgs } from "util";
-import { existsSync, writeFileSync, mkdirSync } from "fs";
-import { resolve } from "path";
+import { existsSync, writeFileSync, readFileSync, mkdirSync } from "fs";
+import { resolve, dirname } from "path";
 import { createInterface } from "readline";
 import { spawnSync } from "child_process";
 import { loadConfig, expandedWatchPaths, defaultConfigToml, resolveConfigPath } from "./config";
@@ -164,24 +164,60 @@ if (positionals[0] === "create") {
     process.exit(1);
   }
 
-  // Load config for projects settings
+  const prompt = createRealPrompt();
+
+  // Load config — or work without one
   const createConfigPath = resolve(resolveConfigPath(values.config, existsSync));
-  if (!existsSync(createConfigPath)) {
-    console.error(`Config file not found: ${createConfigPath}`);
-    console.error(`Run with --init to create a default config.`);
-    process.exit(1);
-  }
-  const createConfig = loadConfig(createConfigPath);
-  if (!createConfig.projects?.root) {
-    console.error("Missing [projects] section in config. Add projects.root to fileflow.toml.");
-    process.exit(1);
+  let createConfig: ReturnType<typeof loadConfig> | null = null;
+
+  if (existsSync(createConfigPath)) {
+    createConfig = loadConfig(createConfigPath);
   }
 
-  const projectsRoot = createConfig.projects.root;
+  let projectsRoot = createConfig?.projects?.root;
+  let allowedCommands = createConfig?.projects?.allowed_commands;
+
+  // If projects.root is missing, ask interactively
+  if (!projectsRoot) {
+    console.log("\n  No [projects] section found in config.\n");
+    const root = await new Promise<string>((res) => {
+      const rl = prompt as any;
+      rl.text("Projects root directory (where projects are created)", undefined).then(res);
+    });
+
+    if (!root || root.trim() === "") {
+      prompt.close();
+      console.error("Projects root is required.");
+      process.exit(1);
+    }
+
+    projectsRoot = resolve(root.trim());
+
+    // Offer to save to config
+    const shouldSave = await new Promise<boolean>((res) => {
+      (prompt as any).confirm("Save this to config for next time?", true).then(res);
+    });
+
+    if (shouldSave) {
+      const savePath = existsSync(createConfigPath) ? createConfigPath : resolve("fileflow.toml");
+      try {
+        let content = "";
+        if (existsSync(savePath)) {
+          content = readFileSync(savePath, "utf-8");
+        }
+        // Append [projects] section
+        const section = `\n[projects]\nroot = "${projectsRoot.replace(/\\/g, "\\\\")}"\n`;
+        writeFileSync(savePath, content + section);
+        console.log(`  Saved to ${savePath}\n`);
+      } catch (e: any) {
+        console.error(`  Could not save config: ${e.message}\n`);
+      }
+    }
+  }
 
   // Load blueprints (optional)
   let blueprintsConfig = undefined;
-  const bpPath = createConfig.projects.blueprints;
+  const bpPath = createConfig?.projects?.blueprints;
   if (bpPath) {
     const resolvedBp = resolve(bpPath);
     if (existsSync(resolvedBp)) {
@@ -198,15 +234,13 @@ if (positionals[0] === "create") {
 
   console.log("\n  FileFlow Project Creator\n");
 
-  const prompt = createRealPrompt();
-
   try {
     const summary = await runCreateFlow({
       projectName,
       projectsRoot,
       blueprints: blueprintsConfig,
       yes: values.yes,
-      allowedCommands: createConfig.projects.allowed_commands,
+      allowedCommands,
       prompt,
       fs: createRealFs(),
       exec: createRealExec(),

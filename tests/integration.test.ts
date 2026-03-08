@@ -317,7 +317,7 @@ root = "${projectsRoot.replace(/\\/g, "\\\\")}"
     expect(stderr).toContain("Usage: fileflow create");
   });
 
-  test("create command fails when config has no [projects] section", async () => {
+  test("create command prompts for projects.root when config has no [projects] section", async () => {
     const dir = setup("create_no_projects");
     const watchDir = join(dir, "watch");
     const destDir = join(dir, "dest");
@@ -330,10 +330,16 @@ match = [".pdf"]
 destination = "${destDir.replace(/\\/g, "\\\\")}"
 `);
 
-    const result = await $`bun run src/index.ts create my-app --config ${configPath}`.quiet().nothrow();
-    expect(result.exitCode).toBe(1);
-    const stderr = Buffer.from(result.stderr).toString("utf-8");
-    expect(stderr).toContain("Missing [projects]");
+    // Send empty input to the prompt so it fails with "required"
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "create", "my-app", "--config", configPath], {
+      stdin: new Blob(["\n"]),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const exitCode = await proc.exited;
+    const stderr = await new Response(proc.stderr).text();
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Projects root is required");
   });
 
   test("--help includes create command and --yes option", async () => {
