@@ -1,7 +1,12 @@
 import { parseArgs } from "util";
-import { existsSync, writeFileSync } from "fs";
+import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
+import { createInterface } from "readline";
+import { spawnSync } from "child_process";
 import { loadConfig, expandedWatchPaths, defaultConfigToml, resolveConfigPath } from "./config";
+import { loadBlueprints } from "./blueprints";
+import { runCreateFlow } from "./creator";
+import type { PromptAdapter, FsAdapter, ExecAdapter } from "./creator";
 import { Classifier } from "./classifier";
 import { hasTempExtension, isFileAccessible, RetryQueue } from "./safety";
 import { moveFile } from "./mover";
@@ -16,11 +21,62 @@ import { checkForUpdate, performUpdate, cleanupOldBinary } from "./updater";
 
 const VERSION = "0.1.0";
 
+// ── Real adapters for create command ─────────────────────────────
+
+function createRealPrompt(): PromptAdapter & { close: () => void } {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const ask = (q: string): Promise<string> =>
+    new Promise((resolve) => rl.question(q, (answer) => resolve(answer)));
+
+  return {
+    select: async (prompt, options) => {
+      console.log(`\n  ${prompt}`);
+      options.forEach((o, i) => console.log(`    ${i + 1}) ${o.label}`));
+      const answer = await ask("  > ");
+      const idx = parseInt(answer, 10) - 1;
+      if (idx >= 0 && idx < options.length) return options[idx]!.value;
+      return options[0]!.value; // fallback to first
+    },
+    text: async (prompt, defaultValue) => {
+      const suffix = defaultValue ? ` (${defaultValue})` : "";
+      const answer = await ask(`  ${prompt}${suffix}: `);
+      return answer || defaultValue || "";
+    },
+    confirm: async (prompt, defaultValue) => {
+      const suffix = defaultValue ? " [Y/n]" : " [y/N]";
+      const answer = await ask(`  ${prompt}${suffix}: `);
+      if (!answer) return defaultValue ?? false;
+      return answer.toLowerCase().startsWith("y");
+    },
+    close: () => rl.close(),
+  };
+}
+
+function createRealFs(): FsAdapter {
+  return {
+    exists: (p) => existsSync(p),
+    mkdir: (p) => mkdirSync(p, { recursive: true }),
+  };
+}
+
+function createRealExec(): ExecAdapter {
+  return {
+    run: async (command, args, cwd) => {
+      const result = spawnSync(command, args, { cwd, encoding: "utf-8", shell: true });
+      return {
+        exitCode: result.status ?? 1,
+        output: (result.stdout || "") + (result.stderr || ""),
+      };
+    },
+  };
+}
+
 // Clean up leftover .old binary from a previous update
 cleanupOldBinary(resolve(process.execPath));
 
-const { values } = parseArgs({
+const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
+  allowPositionals: true,
   options: {
     config: { type: "string" },
     "dry-run": { type: "boolean", default: false },
@@ -34,6 +90,7 @@ const { values } = parseArgs({
     explain: { type: "string" },
     help: { type: "boolean", short: "h", default: false },
     version: { type: "boolean", short: "v", default: false },
+    yes: { type: "boolean", short: "y", default: false },
   },
 });
 
@@ -46,6 +103,10 @@ if (values.help) {
   console.log(`fileflow ${VERSION} — automatic file organizer daemon
 
 Usage: fileflow [options]
+       fileflow create <name> [options]
+
+Commands:
+  create <name>     Create a new project under projects.root
 
 Options:
   --config <path>   Config file path (default: %APPDATA%\\FileFlow\\fileflow.toml, then CWD)
@@ -58,6 +119,7 @@ Options:
   --validate        Validate config, paths, and permissions
   --update          Update to latest version
   --explain <file>  Show which rule matches a file and why
+  --yes, -y         Auto-confirm shell actions in create
   --help, -h        Show this help message
   --version, -v     Show version number`);
   process.exit(0);
@@ -88,6 +150,84 @@ if (values.update) {
     console.log(`Updated to v${result.latestVersion}. Restart fileflow to use the new version.`);
   } catch (e) {
     console.error(`Update failed: ${e}`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
+
+// ── Create command ───────────────────────────────────────────────
+
+if (positionals[0] === "create") {
+  const projectName = positionals[1];
+  if (!projectName) {
+    console.error("Usage: fileflow create <project-name>");
+    process.exit(1);
+  }
+
+  // Load config for projects settings
+  const createConfigPath = resolve(resolveConfigPath(values.config, existsSync));
+  if (!existsSync(createConfigPath)) {
+    console.error(`Config file not found: ${createConfigPath}`);
+    console.error(`Run with --init to create a default config.`);
+    process.exit(1);
+  }
+  const createConfig = loadConfig(createConfigPath);
+  if (!createConfig.projects?.root) {
+    console.error("Missing [projects] section in config. Add projects.root to fileflow.toml.");
+    process.exit(1);
+  }
+
+  const projectsRoot = createConfig.projects.root;
+
+  // Load blueprints (optional)
+  let blueprintsConfig = undefined;
+  const bpPath = createConfig.projects.blueprints;
+  if (bpPath) {
+    const resolvedBp = resolve(bpPath);
+    if (existsSync(resolvedBp)) {
+      const bpResult = loadBlueprints(resolvedBp);
+      if (bpResult.ok) {
+        blueprintsConfig = bpResult.value;
+      } else {
+        console.error("Blueprint config errors:");
+        bpResult.errors.forEach((e) => console.error(`  - ${e}`));
+        console.log("Falling back to default flow.\n");
+      }
+    }
+  }
+
+  console.log("\n  FileFlow Project Creator\n");
+
+  const prompt = createRealPrompt();
+
+  try {
+    const summary = await runCreateFlow({
+      projectName,
+      projectsRoot,
+      blueprints: blueprintsConfig,
+      yes: values.yes,
+      allowedCommands: createConfig.projects.allowed_commands,
+      prompt,
+      fs: createRealFs(),
+      exec: createRealExec(),
+    });
+
+    prompt.close();
+
+    console.log("");
+    for (const action of summary.actions) {
+      const icon = action.success ? "+" : "!";
+      console.log(`  [${icon}] ${action.action}`);
+    }
+    console.log(`\n  Project: ${summary.projectPath}`);
+    if (!summary.success) {
+      console.log("\n  Some actions failed. Check the output above.");
+      process.exit(1);
+    }
+    console.log(`\n  Next:\n    cd ${summary.projectPath}\n`);
+  } catch (e: any) {
+    prompt.close();
+    console.error(`\nError: ${e.message}`);
     process.exit(1);
   }
   process.exit(0);
