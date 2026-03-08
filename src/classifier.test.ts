@@ -1,12 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { Classifier } from "./classifier";
-
-interface Rule {
-  name: string;
-  type: "pattern" | "extension";
-  match: string[];
-  destination: string;
-}
+import type { Rule } from "./config";
 
 const testRules: Rule[] = [
   {

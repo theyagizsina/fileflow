@@ -1,12 +1,8 @@
 import { minimatch } from "minimatch";
 import { extname, basename } from "path";
+import type { Rule } from "./config";
 
-export interface Rule {
-  name: string;
-  type: "pattern" | "extension";
-  match: string[];
-  destination: string;
-}
+export type { Rule };
 
 export interface ClassifyResult {
   ruleName: string;
