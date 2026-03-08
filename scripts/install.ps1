@@ -350,7 +350,8 @@ function Install-FileFlow {
     Write-Host "Generating config for this user profile..."
     $rules = Get-DefaultRules -ProductRoot $productRoot
     $configContent = Build-GeneratedConfig -WatchPaths $WatchPaths -LogPath $logPath -Rules $rules
-    Set-Content -Path $configPath -Value $configContent -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($configPath, $configContent, $utf8NoBom)
     Write-Host "Generated config: $configPath"
     Write-Host "Watch paths:"
     $WatchPaths | ForEach-Object { Write-Host "  - $_" }
