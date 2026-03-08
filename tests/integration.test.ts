@@ -191,6 +191,8 @@ destination = "${destDir.replace(/\\/g, "\\\\")}"
     const output = Buffer.from(result.stdout).toString("utf-8");
     expect(output).toContain("--install");
     expect(output).toContain("--uninstall");
+    expect(output).toContain("--validate");
+    expect(output).toContain("--explain <file>");
   });
 
   test("--status shows config and watch paths", async () => {

@@ -3,3 +3,5 @@ dist/
 *.log
 fileflow.toml
 /target
+fileflow.exe
+.claude/

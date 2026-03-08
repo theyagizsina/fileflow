@@ -11,7 +11,7 @@ retry_interval_seconds = 10
 max_retries = 30
 
 [logging]
-path = "fileflow.log"
+path = "%LOCALAPPDATA%\\FileFlow\\fileflow.log"
 max_size_mb = 10
 rotate = true
 
@@ -26,64 +26,64 @@ enabled = false
 name = "Screenshots"
 type = "pattern"
 match = ["Screenshot*", "Screen Shot*", "Ekran görüntüsü*", "Clipboard*", "Snipaste*", "ShareX*", "Lightshot*", "Greenshot*"]
-destination = "W:\\Media\\Screenshots"
+destination = "%USERPROFILE%\\FileFlow\\Media\\Screenshots"
 
 [[rules]]
 name = "Photos"
 type = "pattern"
 match = ["IMG_*", "DSC_*", "DCIM*", "PXL_*", "DSCF*", "Photo*"]
-destination = "W:\\Media\\Images"
+destination = "%USERPROFILE%\\FileFlow\\Media\\Images"
 
 [[rules]]
 name = "Design Files"
 type = "extension"
 match = [".fig", ".xd", ".sketch", ".psd", ".ai", ".indd", ".afdesign", ".afphoto"]
-destination = "W:\\Design"
+destination = "%USERPROFILE%\\FileFlow\\Design"
 
 [[rules]]
 name = "Videos"
 type = "extension"
 match = [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"]
-destination = "W:\\Media\\Videos"
+destination = "%USERPROFILE%\\FileFlow\\Media\\Videos"
 
 [[rules]]
 name = "Audio"
 type = "extension"
 match = [".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma"]
-destination = "W:\\Media\\Audio"
+destination = "%USERPROFILE%\\FileFlow\\Media\\Audio"
 
 [[rules]]
 name = "Images"
 type = "extension"
 match = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".svg", ".ico", ".raw", ".cr2", ".nef"]
-destination = "W:\\Media\\Images"
+destination = "%USERPROFILE%\\FileFlow\\Media\\Images"
 
 [[rules]]
 name = "Documents"
 type = "extension"
 match = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".txt", ".rtf", ".csv"]
-destination = "W:\\Downloads\\Documents"
+destination = "%USERPROFILE%\\FileFlow\\Downloads\\Documents"
 
 [[rules]]
 name = "Archives"
 type = "extension"
 match = [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2"]
-destination = "W:\\Downloads\\Archives"
+destination = "%USERPROFILE%\\FileFlow\\Downloads\\Archives"
 
 [[rules]]
 name = "Code"
 type = "extension"
 match = [".js", ".ts", ".py", ".html", ".css", ".json", ".yaml", ".yml", ".xml", ".sql", ".sh", ".bat", ".ps1", ".rb", ".go", ".rs", ".java", ".c", ".cpp", ".h", ".php", ".swift", ".kt", ".lua", ".r", ".md"]
-destination = "W:\\Downloads\\Code"
+destination = "%USERPROFILE%\\FileFlow\\Downloads\\Code"
 
 [[rules]]
 name = "Fonts"
 type = "extension"
 match = [".ttf", ".otf", ".woff", ".woff2", ".eot"]
-destination = "W:\\Downloads\\Fonts"
+destination = "%USERPROFILE%\\FileFlow\\Downloads\\Fonts"
 
 [[rules]]
 name = "Setup"
 type = "extension"
 match = [".exe", ".msi", ".appx", ".msix", ".iso", ".img"]
-destination = "W:\\Downloads\\Setup"
+destination = "%USERPROFILE%\\FileFlow\\Downloads\\Setup"
