@@ -463,7 +463,9 @@ const stopConfigReloader = startConfigReloader({
 
     // Update stability delay — read per-event via getter, so this takes effect immediately
     stabilityDelay = newConfig.safety.stability_delay_seconds * 1000;
-    // Note: retryInterval is not updated because setInterval captures the value at creation time
+    // TODO: retryInterval cannot be updated by reassignment — setInterval captures the value at
+    // creation time. To support live retry-interval changes, the interval would need to be
+    // cleared and restarted here. Deferred for now.
 
     // Update watched paths
     for (const p of diff.addedPaths) {

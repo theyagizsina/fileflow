@@ -1,5 +1,5 @@
 import { watch, readdirSync, statSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { log } from "./logger";
 
 export type FileEventType = "created" | "renamed";
@@ -25,12 +25,13 @@ export function startWatching(paths: string[], callback: FileEventCallback): Wat
   const watchers = new Map<string, ReturnType<typeof watch>>();
 
   function addPath(dir: string): void {
-    if (watchers.has(dir)) return;
+    const resolved = resolve(dir);
+    if (watchers.has(resolved)) return;
     try {
-      const w = watch(dir, { recursive: true }, (eventType, filename) => {
+      const w = watch(resolved, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
         if (eventType === "change") return; // in-place modifications are not file-arrival events
-        const fullPath = join(dir, filename);
+        const fullPath = join(resolved, filename);
         try {
           const stat = statSync(fullPath);
           if (stat.isFile()) {
@@ -43,10 +44,10 @@ export function startWatching(paths: string[], callback: FileEventCallback): Wat
           // File may have been deleted between event and stat
         }
       });
-      watchers.set(dir, w);
-      log("info", `Watching: ${dir}`);
+      watchers.set(resolved, w);
+      log("info", `Watching: ${resolved}`);
     } catch {
-      log("warn", `Watch path does not exist, skipping: ${dir}`);
+      log("warn", `Watch path does not exist, skipping: ${resolved}`);
     }
   }
 
@@ -57,11 +58,12 @@ export function startWatching(paths: string[], callback: FileEventCallback): Wat
   return {
     add: (dir: string) => addPath(dir),
     unwatch: (dir: string) => {
-      const w = watchers.get(dir);
+      const resolved = resolve(dir);
+      const w = watchers.get(resolved);
       if (w) {
         w.close();
-        watchers.delete(dir);
-        log("info", `Stopped watching: ${dir}`);
+        watchers.delete(resolved);
+        log("info", `Stopped watching: ${resolved}`);
       }
     },
     close: () => {
