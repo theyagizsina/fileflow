@@ -18,6 +18,7 @@ import { getStatus } from "./status";
 import { runValidation } from "./validate";
 import { explainFile } from "./explain";
 import { checkForUpdate, performUpdate, cleanupOldBinary } from "./updater";
+import { startConfigReloader } from "./config-reloader";
 
 const VERSION = "0.1.1";
 
@@ -366,7 +367,7 @@ initLogger(config.logging);
 log("info", "FileFlow starting...");
 if (dryRun) log("info", "[DRY-RUN] mode enabled — no files will be moved");
 
-const classifier = new Classifier(config.rules);
+let classifier = new Classifier(config.rules);
 const watchPaths = expandedWatchPaths(config);
 
 function processFile(filePath: string): void {
@@ -433,11 +434,11 @@ if (scanOnce) {
 
 // Daemon mode
 const retryQueue = new RetryQueue(config.safety.max_retries);
-const stabilityDelay = config.safety.stability_delay_seconds * 1000;
-const retryInterval = config.safety.retry_interval_seconds * 1000;
+let stabilityDelay = config.safety.stability_delay_seconds * 1000;
+let retryInterval = config.safety.retry_interval_seconds * 1000;
 
 const handleEvent = createEventHandler({
-  stabilityDelayMs: stabilityDelay,
+  get stabilityDelayMs() { return stabilityDelay; },
   hasTempExtensionFn: (path) => hasTempExtension(path, config.safety.ignore_extensions),
   processFile: async (path) => processFile(path),
   existsFn: existsSync,
@@ -447,7 +448,29 @@ const handleEvent = createEventHandler({
   retryQueue,
 });
 
-startWatching(watchPaths, handleEvent);
+const watcher = startWatching(watchPaths, handleEvent);
+
+const stopConfigReloader = startConfigReloader({
+  configPath,
+  currentConfig: config,
+  onReload: (newConfig, diff) => {
+    // Rebuild classifier with new rules
+    classifier = new Classifier(newConfig.rules);
+
+    // Update safety timing — variables are closed over so reassigning takes effect on next event
+    stabilityDelay = newConfig.safety.stability_delay_seconds * 1000;
+    retryInterval = newConfig.safety.retry_interval_seconds * 1000;
+
+    // Update watched paths
+    for (const p of diff.addedPaths) {
+      watcher.add(p);
+    }
+    for (const p of diff.removedPaths) {
+      watcher.unwatch(p);
+    }
+  },
+  logFn: log,
+});
 
 // Retry timer
 setInterval(() => {
@@ -466,6 +489,8 @@ log("info", "FileFlow daemon running. Press Ctrl+C to stop.");
 
 // Keep process alive
 process.on("SIGINT", () => {
+  stopConfigReloader();
+  watcher.close();
   log("info", "Shutting down...");
   process.exit(0);
 });
