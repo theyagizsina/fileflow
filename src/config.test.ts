@@ -295,3 +295,105 @@ path = "fileflow.log"
     expect(load).toThrow(/watch\.paths must be a non-empty array/);
   });
 });
+
+describe("projects config", () => {
+  const tmpDir = join(process.env.TEMP || "/tmp", "fileflow_test_projects");
+
+  function loadToml(toml: string) {
+    rmSync(tmpDir, { recursive: true, force: true });
+    mkdirSync(tmpDir, { recursive: true });
+    const configPath = join(tmpDir, "val.toml");
+    writeFileSync(configPath, toml);
+    return () => loadConfig(configPath);
+  }
+
+  test("parses [projects] root and blueprints", () => {
+    process.env.FILEFLOW_TEST_ROOT = "C:\\MyProjects";
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+
+[projects]
+root = "%FILEFLOW_TEST_ROOT%\\\\Work"
+blueprints = "project-blueprints.json"
+`);
+    const config = load();
+    expect(config.projects?.root).toBe("C:\\MyProjects\\Work");
+    expect(config.projects?.blueprints).toBe("project-blueprints.json");
+    delete process.env.FILEFLOW_TEST_ROOT;
+  });
+
+  test("config without [projects] has undefined projects", () => {
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+`);
+    const config = load();
+    expect(config.projects).toBeUndefined();
+  });
+
+  test("throws when [projects] exists without root", () => {
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+
+[projects]
+blueprints = "project-blueprints.json"
+`);
+    expect(load).toThrow(/projects\.root must be a non-empty string/);
+  });
+
+  test("throws when [projects] has empty root", () => {
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+
+[projects]
+root = ""
+`);
+    expect(load).toThrow(/projects\.root must be a non-empty string/);
+  });
+
+  test("throws when [projects] has empty blueprints", () => {
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+
+[projects]
+root = "C:\\\\Projects"
+blueprints = ""
+`);
+    expect(load).toThrow(/projects\.blueprints must be a non-empty string/);
+  });
+
+  test("parses [projects] with allowed_commands", () => {
+    const load = loadToml(`
+[watch]
+paths = ["C:\\\\Downloads"]
+
+[logging]
+path = "fileflow.log"
+
+[projects]
+root = "C:\\\\Projects"
+allowed_commands = ["git", "bun", "npm"]
+`);
+    const config = load();
+    expect(config.projects?.allowed_commands).toEqual(["git", "bun", "npm"]);
+  });
+});

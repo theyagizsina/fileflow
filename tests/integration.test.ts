@@ -293,4 +293,60 @@ destination = "${destDir.replace(/\\/g, "\\\\")}"
     const output = Buffer.from(result.stdout).toString("utf-8");
     expect(output).toContain("No rule matched");
   });
+
+  test("create command fails without project name", async () => {
+    const dir = setup("create_no_name");
+    const watchDir = join(dir, "watch");
+    const destDir = join(dir, "dest");
+    mkdirSync(watchDir, { recursive: true });
+    const projectsRoot = join(dir, "projects");
+    const configPath = writeConfig(dir, [watchDir], destDir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${destDir.replace(/\\/g, "\\\\")}"
+
+[projects]
+root = "${projectsRoot.replace(/\\/g, "\\\\")}"
+`);
+
+    const result = await $`bun run src/index.ts create --config ${configPath}`.quiet().nothrow();
+    expect(result.exitCode).toBe(1);
+    const stderr = Buffer.from(result.stderr).toString("utf-8");
+    expect(stderr).toContain("Usage: fileflow create");
+  });
+
+  test("create command prompts for projects.root when config has no [projects] section", async () => {
+    const dir = setup("create_no_projects");
+    const watchDir = join(dir, "watch");
+    const destDir = join(dir, "dest");
+    mkdirSync(watchDir, { recursive: true });
+    const configPath = writeConfig(dir, [watchDir], destDir, `
+[[rules]]
+name = "Docs"
+type = "extension"
+match = [".pdf"]
+destination = "${destDir.replace(/\\/g, "\\\\")}"
+`);
+
+    // Send empty input to the prompt so it fails with "required"
+    const proc = Bun.spawn(["bun", "run", "src/index.ts", "create", "my-app", "--config", configPath], {
+      stdin: new Blob(["\n"]),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const exitCode = await proc.exited;
+    const stderr = await new Response(proc.stderr).text();
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Projects root is required");
+  });
+
+  test("--help includes create command and --yes option", async () => {
+    const result = await $`bun run src/index.ts --help`.quiet().nothrow();
+    expect(result.exitCode).toBe(0);
+    const output = Buffer.from(result.stdout).toString("utf-8");
+    expect(output).toContain("create <name>");
+    expect(output).toContain("--yes");
+  });
 });

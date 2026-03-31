@@ -1,0 +1,88 @@
+{
+  "$schema": "./project-blueprints.schema.json",
+  "blueprints": [
+    {
+      "id": "software",
+      "name": "Software Project",
+      "description": "General-purpose software project with git setup",
+      "steps": [
+        {
+          "id": "git_strategy",
+          "type": "select",
+          "prompt": "Git strategy:",
+          "options": [
+            { "value": "init", "label": "Initialize new repository" },
+            { "value": "clone", "label": "Clone existing repository" },
+            { "value": "none", "label": "No git" }
+          ]
+        },
+        {
+          "id": "repo_url",
+          "type": "text",
+          "prompt": "Repository URL:",
+          "condition": { "step": "git_strategy", "equals": "clone" }
+        },
+        {
+          "id": "install_deps",
+          "type": "confirm",
+          "prompt": "Install dependencies?",
+          "default": true
+        },
+        {
+          "id": "package_manager",
+          "type": "select",
+          "prompt": "Package manager:",
+          "options": [
+            { "value": "bun", "label": "bun" },
+            { "value": "npm", "label": "npm" },
+            { "value": "pnpm", "label": "pnpm" },
+            { "value": "yarn", "label": "yarn" }
+          ],
+          "condition": { "step": "install_deps", "equals": true }
+        }
+      ],
+      "actions": [
+        {
+          "type": "mkdir"
+        },
+        {
+          "type": "git_init",
+          "condition": { "step": "git_strategy", "equals": "init" }
+        },
+        {
+          "type": "git_clone",
+          "url": "{{repo_url}}",
+          "condition": { "step": "git_strategy", "equals": "clone" }
+        },
+        {
+          "type": "shell",
+          "command": "{{package_manager}}",
+          "args": ["install"],
+          "condition": { "step": "install_deps", "equals": true }
+        }
+      ]
+    },
+    {
+      "id": "notes",
+      "name": "Notes / Documentation",
+      "description": "Simple directory with git and a README",
+      "steps": [
+        {
+          "id": "init_git",
+          "type": "confirm",
+          "prompt": "Initialize git repository?",
+          "default": true
+        }
+      ],
+      "actions": [
+        {
+          "type": "mkdir"
+        },
+        {
+          "type": "git_init",
+          "condition": { "step": "init_git", "equals": true }
+        }
+      ]
+    }
+  ]
+}

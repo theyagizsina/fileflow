@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fileflow.dev/project-blueprints.schema.json",
+  "title": "FileFlow Project Blueprints",
+  "description": "Schema for project blueprint configuration files used by fileflow create",
+  "type": "object",
+  "required": ["blueprints"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path or URL to this schema file"
+    },
+    "blueprints": {
+      "type": "array",
+      "description": "List of project blueprints",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/Blueprint" }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Blueprint": {
+      "type": "object",
+      "description": "A single project blueprint defining steps and actions",
+      "required": ["id", "name", "steps", "actions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this blueprint",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable name displayed in the selection menu",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the blueprint"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Interactive prompts shown to the user during project creation",
+          "items": { "$ref": "#/definitions/BlueprintStep" }
+        },
+        "actions": {
+          "type": "array",
+          "description": "Actions executed after all steps are completed",
+          "items": { "$ref": "#/definitions/BlueprintAction" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "BlueprintStep": {
+      "type": "object",
+      "description": "A single interactive prompt step",
+      "required": ["id", "prompt", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique step identifier, used to reference answers in conditions and templates",
+          "minLength": 1
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The question displayed to the user",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "description": "Input type for this step",
+          "enum": ["select", "confirm", "text"]
+        },
+        "options": {
+          "type": "array",
+          "description": "Available options (required when type is \"select\")",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/StepOption" }
+        },
+        "default": {
+          "description": "Default value for this step",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "boolean" }
+          ]
+        },
+        "condition": {
+          "$ref": "#/definitions/StepCondition",
+          "description": "If present, this step is only shown when the condition is met"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": { "type": { "const": "select" } }
+      },
+      "then": {
+        "required": ["options"]
+      }
+    },
+    "StepOption": {
+      "type": "object",
+      "description": "A selectable option for a select-type step",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "The value stored when this option is selected"
+        },
+        "label": {
+          "type": "string",
+          "description": "The label displayed to the user"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StepCondition": {
+      "type": "object",
+      "description": "Condition that references a previous step's answer",
+      "required": ["step", "equals"],
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "The id of the step whose answer to check"
+        },
+        "equals": {
+          "description": "The value to compare against",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "boolean" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "BlueprintAction": {
+      "type": "object",
+      "description": "An action executed during project creation",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "The action type to execute",
+          "enum": ["mkdir", "git_init", "git_clone", "shell"]
+        },
+        "condition": {
+          "$ref": "#/definitions/StepCondition",
+          "description": "If present, this action only runs when the condition is met"
+        },
+        "url": {
+          "type": "string",
+          "description": "Repository URL (used with git_clone). Supports {{step_id}} template syntax."
+        },
+        "command": {
+          "type": "string",
+          "description": "Shell command to execute (used with shell)"
+        },
+        "args": {
+          "type": "array",
+          "description": "Arguments for the shell command",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
