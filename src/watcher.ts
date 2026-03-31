@@ -29,6 +29,7 @@ export function startWatching(paths: string[], callback: FileEventCallback): Wat
     try {
       const w = watch(dir, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
+        if (eventType === "change") return; // in-place modifications are not file-arrival events
         const fullPath = join(dir, filename);
         try {
           const stat = statSync(fullPath);

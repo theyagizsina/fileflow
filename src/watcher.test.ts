@@ -21,8 +21,9 @@ describe("startWatching", () => {
 
     // Track events received by the callback
     const events: { type: string; path: string }[] = [];
+    let handle: ReturnType<typeof startWatching>;
     const gotEvent = new Promise<void>((resolve) => {
-      startWatching([tempDir], (event) => {
+      handle = startWatching([tempDir], (event) => {
         events.push(event);
         resolve();
       });
@@ -41,6 +42,8 @@ describe("startWatching", () => {
     );
 
     await Promise.race([gotEvent, timeout]);
+
+    handle!.close();
 
     // Verify the callback was invoked with the correct full path
     expect(events.length).toBeGreaterThanOrEqual(1);
