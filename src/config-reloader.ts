@@ -48,7 +48,6 @@ export function startConfigReloader(opts: ConfigReloaderOptions): () => void {
         const oldPaths = currentConfig.watch.paths.map(expandEnvVars);
         const newPaths = newConfig.watch.paths.map(expandEnvVars);
         const diff = diffPaths(oldPaths, newPaths);
-        currentConfig = newConfig;
 
         logFn(
           "info",
@@ -63,6 +62,7 @@ export function startConfigReloader(opts: ConfigReloaderOptions): () => void {
         }
 
         onReload(newConfig, diff);
+        currentConfig = newConfig;
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         logFn("warn", `CONFIG_RELOAD_FAILED ${configPath} (reason: ${msg})`);
