@@ -368,10 +368,11 @@ log("info", "FileFlow starting...");
 if (dryRun) log("info", "[DRY-RUN] mode enabled — no files will be moved");
 
 let classifier = new Classifier(config.rules);
+let currentIgnoreExtensions = config.safety.ignore_extensions;
 const watchPaths = expandedWatchPaths(config);
 
 function processFile(filePath: string): void {
-  if (hasTempExtension(filePath, config.safety.ignore_extensions)) {
+  if (hasTempExtension(filePath, currentIgnoreExtensions)) {
     log("info", `SKIPPED ${filePath} (reason: temp_extension)`);
     return;
   }
@@ -439,7 +440,7 @@ let retryInterval = config.safety.retry_interval_seconds * 1000;
 
 const handleEvent = createEventHandler({
   get stabilityDelayMs() { return stabilityDelay; },
-  hasTempExtensionFn: (path) => hasTempExtension(path, config.safety.ignore_extensions),
+  hasTempExtensionFn: (path) => hasTempExtension(path, currentIgnoreExtensions),
   processFile: async (path) => processFile(path),
   existsFn: existsSync,
   accessibleFn: isFileAccessible,
@@ -457,9 +458,12 @@ const stopConfigReloader = startConfigReloader({
     // Rebuild classifier with new rules
     classifier = new Classifier(newConfig.rules);
 
-    // Update safety timing — variables are closed over so reassigning takes effect on next event
+    // Update ignore extensions list
+    currentIgnoreExtensions = newConfig.safety.ignore_extensions;
+
+    // Update stability delay — read per-event via getter, so this takes effect immediately
     stabilityDelay = newConfig.safety.stability_delay_seconds * 1000;
-    retryInterval = newConfig.safety.retry_interval_seconds * 1000;
+    // Note: retryInterval is not updated because setInterval captures the value at creation time
 
     // Update watched paths
     for (const p of diff.addedPaths) {
