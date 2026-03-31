@@ -47,4 +47,13 @@ describe("startWatching", () => {
     const matchingEvent = events.find((e) => e.path === testFile);
     expect(matchingEvent).toBeDefined();
   });
+
+  test("returns a watcher handle with a close method", () => {
+    const tmpDir2 = join(tmpdir(), `fileflow-watcher-handle-test-${Date.now()}`);
+    mkdirSync(tmpDir2, { recursive: true });
+    const handle = startWatching([tmpDir2], () => {});
+    expect(typeof handle.close).toBe("function");
+    handle.close();
+    rmSync(tmpDir2, { recursive: true, force: true });
+  });
 });

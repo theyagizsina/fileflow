@@ -15,15 +15,21 @@ export interface ScanStats {
 
 export type FileEventCallback = (event: FileEvent) => void;
 
-export function startWatching(paths: string[], callback: FileEventCallback): void {
-  for (const dir of paths) {
+export interface WatcherHandle {
+  add: (dir: string) => void;
+  unwatch: (dir: string) => void;
+  close: () => void;
+}
+
+export function startWatching(paths: string[], callback: FileEventCallback): WatcherHandle {
+  const watchers = new Map<string, ReturnType<typeof watch>>();
+
+  function addPath(dir: string): void {
+    if (watchers.has(dir)) return;
     try {
-      watch(dir, { recursive: true }, (eventType, filename) => {
+      const w = watch(dir, { recursive: true }, (eventType, filename) => {
         if (!filename) return;
         const fullPath = join(dir, filename);
-
-        // fs.watch emits 'rename' for both create and rename on Windows
-        // We treat both as potential new files
         try {
           const stat = statSync(fullPath);
           if (stat.isFile()) {
@@ -36,11 +42,32 @@ export function startWatching(paths: string[], callback: FileEventCallback): voi
           // File may have been deleted between event and stat
         }
       });
+      watchers.set(dir, w);
       log("info", `Watching: ${dir}`);
-    } catch (e) {
+    } catch {
       log("warn", `Watch path does not exist, skipping: ${dir}`);
     }
   }
+
+  for (const dir of paths) {
+    addPath(dir);
+  }
+
+  return {
+    add: (dir: string) => addPath(dir),
+    unwatch: (dir: string) => {
+      const w = watchers.get(dir);
+      if (w) {
+        w.close();
+        watchers.delete(dir);
+        log("info", `Stopped watching: ${dir}`);
+      }
+    },
+    close: () => {
+      for (const w of watchers.values()) w.close();
+      watchers.clear();
+    },
+  };
 }
 
 export function scanExisting(paths: string[], stats?: ScanStats): string[] {
